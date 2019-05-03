@@ -1,23 +1,11 @@
-
-# coding: utf-8
-
-# In[1]:
-
-
 import re
 import time
 from collections import Counter, defaultdict
 import pandas as pd
 import numpy as np
 
-import en_core_web_sm
-import en_coref_sm
-
-
-# ## Feature sentiment extraction module based on dependency graph
-
-# In[3]:
-
+import spacy
+import neuralcoref
 
 # dependency relation based feature sentiment extraction
 def feature_sentiment(sentence):
@@ -27,7 +15,7 @@ def feature_sentiment(sentence):
     output: updated dictionary
     '''
     sent_dict = Counter()
-    sentence = spacy(sentence)
+    sentence = nlp(sentence)
     debug = 0
 #     print('token.text, token.pos_, token.dep_, token.head, token.head.dep_, token.children')
     for token in sentence:
@@ -122,9 +110,6 @@ def feature_sentiment(sentence):
     return sent_dict
 
 
-# In[4]:
-
-
 def classify_and_sent(sentence):
     '''
     function: classify the sentence into a category, and assign sentiment
@@ -136,13 +121,14 @@ def classify_and_sent(sentence):
     sent_dict = feature_sentiment(sentence)
     return sent_dict
 
+
 def replace_pronouns(text):
     '''
     function: replaces the pronouns in a text with referring word
     input: text that needs to be processed
     output: pronoun replaced text
     '''
-    doc = coref(text)
+    doc = nlp(text)
     text_updated = ''
     if doc._.coref_resolved == '':
         text_updated = text
@@ -150,13 +136,14 @@ def replace_pronouns(text):
         text_updated = doc._.coref_resolved
     return text_updated
 
+
 def split_sentence(text):
     '''
     function: splits review into a list of sentences using spacy's sentence parser
     input: complete input text
     output: list of sentences
     '''
-    review = spacy(text)
+    review = nlp(text)
     bag_sentence = []
     start = 0
     for token in review:
@@ -167,6 +154,7 @@ def split_sentence(text):
             bag_sentence.append(review[start:(token.i+1)])
     return bag_sentence
 
+
 def remove_special_char(sentence):
     '''
     function: removes the special characters in a text
@@ -174,6 +162,7 @@ def remove_special_char(sentence):
     output: special character removed text
     '''
     return re.sub(r"[^a-zA-Z0-9.',:;?]+", ' ', sentence)
+
 
 def review_pipe(review):
     '''
@@ -189,6 +178,7 @@ def review_pipe(review):
         sent_dict = classify_and_sent(sentence.lower())
         dict.update(review_dict,sent_dict)
     return review_dict
+
 
 # feature sentiment mining for review
 def review_feature_sentiment_extraction(review):
@@ -214,17 +204,16 @@ def review_feature_sentiment_extraction(review):
             senti = 'neg'
         else:
             senti = 'neu'
-        feat_senti = feat, senti
+#         feat_senti = feat, senti
+        feat_senti = feature, opinion, senti
         feat_senti_list.append(feat_senti)
     return feat_senti_list
 
 
-# In[26]:
-
 start_time = time.time()
 # load NLP resources
-spacy = en_core_web_sm.load()
-coref = en_coref_sm.load()
+nlp = spacy.load("en_core_web_sm")
+neuralcoref.add_to_pipe(nlp)
 
 # Load opinion lexicon
 neg_file = open("resources/opinion-lexicon-English/neg_words.txt",encoding = "ISO-8859-1")
@@ -240,29 +229,17 @@ end_time = time.time()
 execution_time = end_time - start_time
 print('resource loadup time: ' + str(execution_time))
 
-
-# In[9]:
-
-
 # # # test code for feature sentiment
-# review = "I came here with my friends on a Tuesday night. The sushi here is amazing. Our waiter was very helpful, but the music was terrible."
+# # review = "I came here with my friends on a Tuesday night. The sushi here is amazing. Our waiter was very helpful, but the music was terrible."
 # # review = "This is an awesome chicken sushi."
 # # review = "This is not awesome chicken soup."
-# # review = "The zipper is difficult to work."
-
-
-# In[28]:
-
+# review = "The zipper is difficult to work. It's expensive."
 
 # feature_sentiment_list = review_feature_sentiment_extraction(review)
-# feature_sentiment_list
+# print(feature_sentiment_list)
 
 
 # ## Feature sentiment extraction from Groupon deals and transaction data
-
-# In[29]:
-
-
 # df_deal_clean = pd.read_csv('dataset/clean_deal_data.csv')
 # df_review_clean = pd.read_csv('dataset/clean_review_data.csv')
 # # merge review dataframe and deal dataframe
@@ -278,6 +255,5 @@ df_sample['feature_sentiment_extracted'] = df_sample['review_text'].apply(review
 end_time = time.time()
 execution_time = end_time - start_time
 print('execution time: ' + str(execution_time))
-
 
 df_sample.to_csv('output/transaction_feature_sentiment_data.csv', index=False)
